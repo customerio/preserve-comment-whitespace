@@ -1,6 +1,6 @@
 {
   "name": "preserve-comment-whitespace",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Preserves the presence or lack thereof of whitespace surrounding HTML comments.",
   "main": "index.js",
   "scripts": {
