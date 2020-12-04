@@ -1,5 +1,5 @@
 const COMMENT_REGEX = require("html-comment-regex");
-const applyRanges = require("ranges-apply");
+const applyRanges = require("ranges-apply/dist/ranges-apply.cjs.js");
 const IS_WHITESPACE_REGEX = /\s+/;
 const WHITESPACE_AT_START_REGEX = /^\s*/;
 const WHITESPACE_AT_END_REGEX = /\s*$/;
