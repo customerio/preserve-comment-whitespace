@@ -1,11 +1,23 @@
 const COMMENT_REGEX = require("html-comment-regex");
 const applyRanges = require("ranges-apply");
-const IS_WHITESPACE_REGEX = /\s/;
+const IS_WHITESPACE_REGEX = /\s+/;
 const WHITESPACE_AT_START_REGEX = /^\s*/;
 const WHITESPACE_AT_END_REGEX = /\s*$/;
 
-function isWhitespace(char) {
-  return IS_WHITESPACE_REGEX.test(char);
+function last(arr) {
+  return arr[arr.length - 1];
+}
+
+function first(arr) {
+  return arr[0];
+}
+
+function isWhitespace(str) {
+  return IS_WHITESPACE_REGEX.test(str);
+}
+
+function hasNewLine(str) {
+  return str.includes("\n");
 }
 
 const countMatches = (str, regex) => {
@@ -20,19 +32,26 @@ function preserve(str) {
     const [match] = result;
     const startIndex = COMMENT_REGEX.lastIndex - match.length;
     const endIndex = COMMENT_REGEX.lastIndex;
-    const previousChar = str.charAt(startIndex - 1);
-    const nextChar = str.charAt(endIndex);
+
+    const [leadingWhitespace] = WHITESPACE_AT_END_REGEX.exec(
+      str.substring(0, startIndex)
+    );
+    const [trailingWhitespace] = WHITESPACE_AT_START_REGEX.exec(
+      str.substring(endIndex)
+    );
 
     comments.push({
-      hasLeadingWhitespace: isWhitespace(previousChar),
-      hasTrailingWhitespace: isWhitespace(nextChar),
+      leadingWhitespace,
+      trailingWhitespace,
+      hasLeadingWhitespace: !!leadingWhitespace,
+      hasTrailingWhitespace: !!trailingWhitespace,
     });
   }
 
   return comments;
 }
 
-function restore(str, comments = []) {
+function restore(str, comments = [], options = { restoreInline: true }) {
   let ranges = [];
   let i = 0;
 
@@ -44,29 +63,55 @@ function restore(str, comments = []) {
     const [match] = result;
     const startIndex = COMMENT_REGEX.lastIndex - match.length;
     const endIndex = COMMENT_REGEX.lastIndex;
-    const { hasLeadingWhitespace, hasTrailingWhitespace } = comments[i];
-
-    const previousChar = str.charAt(startIndex - 1);
-    const nextChar = str.charAt(endIndex);
+    const {
+      hasLeadingWhitespace,
+      hasTrailingWhitespace,
+      leadingWhitespace,
+      trailingWhitespace,
+    } = comments[i];
+    const [newLeadingWhitespace] = WHITESPACE_AT_END_REGEX.exec(
+      str.substring(0, startIndex)
+    );
+    const [newTrailingWhitespace] = WHITESPACE_AT_START_REGEX.exec(
+      str.substring(endIndex)
+    );
 
     /**
      * If this comment is not suppose to have leading whitespace
      * and it does, get the range of the whitespace before the
      * comment to be removed.
      */
-    if (!hasLeadingWhitespace && isWhitespace(previousChar)) {
-      const [whitespace] = WHITESPACE_AT_END_REGEX.exec(
-        str.substring(0, startIndex)
-      );
-      ranges.push([startIndex - whitespace.length, startIndex, ""]);
+    if (!hasLeadingWhitespace && isWhitespace(newLeadingWhitespace)) {
+      ranges.push([startIndex - newLeadingWhitespace.length, startIndex, ""]);
     }
 
     /**
-     * If this comment is suppose to have leading whitespace
-     * and it doesn't, add in a whitespace char
+     * restore correct leading whitespace
      */
-    if (hasLeadingWhitespace && !isWhitespace(previousChar)) {
-      ranges.push([startIndex, startIndex, " "]);
+    if (hasLeadingWhitespace) {
+      // if it is now has no whitespace, restore the whitespace until the first new line
+      if (!isWhitespace(newLeadingWhitespace)) {
+        ranges.push([
+          startIndex,
+          startIndex,
+          last(leadingWhitespace.split("\n")),
+        ]);
+      }
+
+      // it is now on it's own line and it wasn't before, replace it the whitespace until the first new line
+      else if (
+        options.restoreInline &&
+        hasNewLine(newLeadingWhitespace) &&
+        !hasNewLine(leadingWhitespace)
+      ) {
+        ranges.push([
+          startIndex - newLeadingWhitespace.length,
+          startIndex,
+          last(leadingWhitespace.split("\n")),
+        ]);
+      } else {
+        // it has ok whitespace so leave it alone
+      }
     }
 
     /**
@@ -74,19 +119,37 @@ function restore(str, comments = []) {
      * and it does, get the range of the whitespace after the
      * comment to be removed.
      */
-    if (!hasTrailingWhitespace && isWhitespace(nextChar)) {
-      const [whitespace] = WHITESPACE_AT_START_REGEX.exec(
-        str.substring(endIndex)
-      );
-      ranges.push([endIndex, endIndex + whitespace.length, ""]);
+    if (!hasTrailingWhitespace && isWhitespace(newTrailingWhitespace)) {
+      ranges.push([endIndex, endIndex + newTrailingWhitespace.length, ""]);
     }
 
     /**
-     * If this comment is suppose to have leading whitespace
-     * and it doesn't, add in a whitespace char
+     * restore correct trailing whitespace
      */
-    if (hasTrailingWhitespace && !isWhitespace(previousChar)) {
-      ranges.push([endIndex, endIndex, " "]);
+    if (hasTrailingWhitespace) {
+      // if it is now has no whitespace, restore the whitespace until the first new line
+      if (!isWhitespace(newTrailingWhitespace)) {
+        ranges.push([
+          endIndex,
+          endIndex,
+          first(trailingWhitespace.split("\n")),
+        ]);
+      }
+
+      // it is now on it's own line and it wasn't before, replace it the whitespace until the first new line
+      else if (
+        options.restoreInline &&
+        hasNewLine(newTrailingWhitespace) &&
+        !hasNewLine(trailingWhitespace)
+      ) {
+        ranges.push([
+          endIndex,
+          endIndex + newTrailingWhitespace.length,
+          first(trailingWhitespace.split("\n")),
+        ]);
+      } else {
+        // it has ok whitespace so leave it alone
+      }
     }
 
     i++;

@@ -39,9 +39,28 @@ const formattedAndRestored = restore(formatted, comments)
 
 Returns an Array containing the objects descripting the HTML comments.
 
-### restore(html, comments)
+### restore(html, comments, options)
 
 Returns a string where the whitespace around the HTML comments is restored.
+
+**Note:** the processing between `preserve` and `restore` should add or remove any comments. If the number of comments given don't match the number of comments found in the given HTML, `restore` will return the given string, unprocessed.
+
+#### html
+> `String` | required
+
+String of HTML after any formatting that would have affected the whitespace.
+
+#### comments
+> `Array` | defaults to `[]`
+
+The Array returned from `preserve`.
+
+#### options
+> `Object` | defaults to `{ restoreInline: true }`
+
+Configuration for how to restore the comment whitespace.
+
+Accept `restoreInline`. If `true`, comments that were originally inline (i.e. not on their own lines) will be restored to be inline. Otherwise, it will accept the new line placement.
 
 ## Related
 

@@ -6,18 +6,26 @@ describe("preserve", () => {
    */
   test("preserves comments correctly", () => {
     expect(preserve(`<div><!--hello world--></div>`)[0]).toMatchObject({
+      leadingWhitespace: "",
+      trailingWhitespace: "",
       hasLeadingWhitespace: false,
       hasTrailingWhitespace: false,
     });
     expect(preserve(`<div> <!--hello world--></div>`)[0]).toMatchObject({
+      leadingWhitespace: " ",
+      trailingWhitespace: "",
       hasLeadingWhitespace: true,
       hasTrailingWhitespace: false,
     });
     expect(preserve(`<div><!--hello world--> </div>`)[0]).toMatchObject({
+      leadingWhitespace: "",
+      trailingWhitespace: " ",
       hasLeadingWhitespace: false,
       hasTrailingWhitespace: true,
     });
     expect(preserve(`<div> <!--hello world--> </div>`)[0]).toMatchObject({
+      leadingWhitespace: " ",
+      trailingWhitespace: " ",
       hasLeadingWhitespace: true,
       hasTrailingWhitespace: true,
     });
@@ -25,6 +33,8 @@ describe("preserve", () => {
 
   test("preserves comments with new lines inside of them", () => {
     expect(preserve(`<div> <!--hello\nworld--> </div>`)[0]).toMatchObject({
+      leadingWhitespace: " ",
+      trailingWhitespace: " ",
       hasLeadingWhitespace: true,
       hasTrailingWhitespace: true,
     });
@@ -32,10 +42,14 @@ describe("preserve", () => {
 
   test("preserves comments with tabs and new lines ", () => {
     expect(preserve(`<div>\n<!--hello world-->\n</div>`)[0]).toMatchObject({
+      leadingWhitespace: "\n",
+      trailingWhitespace: "\n",
       hasLeadingWhitespace: true,
       hasTrailingWhitespace: true,
     });
     expect(preserve(`<div>\t<!--hello world-->\t</div>`)[0]).toMatchObject({
+      leadingWhitespace: "\t",
+      trailingWhitespace: "\t",
       hasLeadingWhitespace: true,
       hasTrailingWhitespace: true,
     });
@@ -43,13 +57,17 @@ describe("preserve", () => {
 
   test("preserves multiple comments", () => {
     const comments = preserve(
-      `<div>\t<!--first comment-->\t<!--second comment--></div>`
+      `<div>\t<!--first comment--> <!--second comment--></div>`
     );
     expect(comments[0]).toMatchObject({
+      leadingWhitespace: "\t",
+      trailingWhitespace: " ",
       hasLeadingWhitespace: true,
       hasTrailingWhitespace: true,
     });
     expect(comments[1]).toMatchObject({
+      leadingWhitespace: " ",
+      trailingWhitespace: "",
       hasLeadingWhitespace: true,
       hasTrailingWhitespace: false,
     });
@@ -66,7 +84,12 @@ describe("restore", () => {
     const html = "<div>\n<!--hello world-->\n</div>";
     expect(
       restore(html, [
-        { hasLeadingWhitespace: true, hasTrailingWhitespace: true },
+        {
+          leadingWhitespace: "\n",
+          trailingWhitespace: "\n",
+          hasLeadingWhitespace: true,
+          hasTrailingWhitespace: true,
+        },
       ])
     ).toBe(html);
   });
@@ -102,15 +125,38 @@ describe("restore", () => {
   test("restores leading whitespace after it is removed", () => {
     expect(
       restore("<div><!--hello world--></div>", [
-        { hasLeadingWhitespace: true, hasTrailingWhitespace: false },
+        {
+          leadingWhitespace: "\t\t ",
+          trailingWhitespace: "",
+          hasLeadingWhitespace: true,
+          hasTrailingWhitespace: false,
+        },
       ])
-    ).toBe("<div> <!--hello world--></div>");
+    ).toBe("<div>\t\t <!--hello world--></div>");
+  });
+
+  test("restores correct leading whitespace after the comment is placed on a new line even though it wasn't originally", () => {
+    expect(
+      restore("<div>\n  <!--hello world--></div>", [
+        {
+          leadingWhitespace: "\t\t ",
+          trailingWhitespace: "",
+          hasLeadingWhitespace: true,
+          hasTrailingWhitespace: false,
+        },
+      ])
+    ).toBe("<div>\t\t <!--hello world--></div>");
   });
 
   test("restores leading lack of whitespace after it is added", () => {
     expect(
       restore("<div> <!--hello world--></div>", [
-        { hasLeadingWhitespace: false, hasTrailingWhitespace: false },
+        {
+          leadingWhitespace: "",
+          trailingWhitespace: "",
+          hasLeadingWhitespace: false,
+          hasTrailingWhitespace: false,
+        },
       ])
     ).toBe("<div><!--hello world--></div>");
   });
@@ -118,16 +164,56 @@ describe("restore", () => {
   test("restores trailing whitespace after it is removed", () => {
     expect(
       restore("<div><!--hello world--></div>", [
-        { hasLeadingWhitespace: false, hasTrailingWhitespace: true },
+        {
+          leadingWhitespace: "",
+          trailingWhitespace: "\t ",
+          hasLeadingWhitespace: false,
+          hasTrailingWhitespace: true,
+        },
       ])
-    ).toBe("<div><!--hello world--> </div>");
+    ).toBe("<div><!--hello world-->\t </div>");
+  });
+
+  test("restores correct trailing whitespace after the comment is placed on a new line even though it wasn't originally", () => {
+    expect(
+      restore("<div><!--hello world-->\n</div>", [
+        {
+          leadingWhitespace: "",
+          trailingWhitespace: "\t\t ",
+          hasLeadingWhitespace: false,
+          hasTrailingWhitespace: true,
+        },
+      ])
+    ).toBe("<div><!--hello world-->\t\t </div>");
   });
 
   test("restores trailing lack of whitespace after it is added", () => {
     expect(
       restore("<div><!--hello world--> </div>", [
-        { hasLeadingWhitespace: false, hasTrailingWhitespace: false },
+        {
+          leadingWhitespace: "",
+          trailingWhitespace: "",
+          hasLeadingWhitespace: false,
+          hasTrailingWhitespace: false,
+        },
       ])
     ).toBe("<div><!--hello world--></div>");
+  });
+
+  test("respects `options.restoreInline`", () => {
+    expect(
+      restore(
+        "<div><!--hello world-->\n</div>",
+        [
+          {
+            leadingWhitespace: "",
+            trailingWhitespace: "\t\t ",
+            hasLeadingWhitespace: false,
+            hasTrailingWhitespace: true,
+          },
+        ],
+        { restoreInline: false }
+      )
+    ).toBe("<div><!--hello world-->\n</div>");
   });
 });
